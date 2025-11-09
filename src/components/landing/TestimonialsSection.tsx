@@ -26,7 +26,7 @@ const TestimonialCard = ({ testimonial }: { testimonial: Testimonial }) => (
   <div className="flex h-full flex-col gap-4 rounded-lg bg-background-card p-6 border border-border">
     <StarRating rating={testimonial.rating} />
     <h3 className="font-semibold text-foreground">Made my job hunt easier.</h3>
-    <p className="text-foreground-secondary flex-grow">"{testimonial.text}"</p>
+    <p className="text-foreground-secondary flex-grow">&quot;{testimonial.text}&quot;</p>
     <div className="text-sm text-foreground-muted">
       &mdash; {testimonial.author}, {testimonial.date}
     </div>

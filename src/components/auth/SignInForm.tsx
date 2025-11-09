@@ -10,7 +10,7 @@ export const SignInForm = () => {
           Sign In
         </h1>
         <p className="mt-2 text-foreground-secondary">
-          Welcome back, let's pick up where you left off.
+          Welcome back, let&apos;s pick up where you left off.
         </p>
         
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">

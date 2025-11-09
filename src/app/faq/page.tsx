@@ -55,7 +55,7 @@ export default function FaqPage() {
             Frequently Asked Questions
           </h1>
           <p className="mt-4 text-lg text-foreground-secondary">
-            Got questions? We've got answers.
+            Got questions? We&apos;ve got answers.
           </p>
         </div>
 
