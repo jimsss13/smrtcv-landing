@@ -45,7 +45,7 @@ export default function AboutPage() {
 
       <CenteredTextSection title="Smart CV as your Smart Resume Builder">
         <p>
-          Smart CV is designed to do more than just build your resume—it&apos;s for for
+          Smart CV is designed to do more than just build your resume—it&apos;s for
           creating resumes that truly make an impact. With a few simple yet
           powerful features, Smart CV helps you build professional resumes in just
           minutes, not hours.

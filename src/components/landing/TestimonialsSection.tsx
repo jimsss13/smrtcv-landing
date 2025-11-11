@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import useEmblaCarousel, { EmblaCarouselType } from 'embla-carousel-react';
+import useEmblaCarousel from 'embla-carousel-react';
+import type { EmblaCarouselType } from 'embla-carousel';
 import { ArrowLeft, ArrowRight, Star } from 'lucide-react';
 import { Testimonial } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -26,7 +27,7 @@ const TestimonialCard = ({ testimonial }: { testimonial: Testimonial }) => (
   <div className="flex h-full flex-col gap-4 rounded-lg bg-background-card p-6 border border-border">
     <StarRating rating={testimonial.rating} />
     <h3 className="font-semibold text-foreground">Made my job hunt easier.</h3>
-    <p className="text-foreground-secondary flex-grow">&quot;{testimonial.text}&quot;</p>
+    <p className="text-foreground-secondary grow">&quot;{testimonial.text}&quot;</p>
     <div className="text-sm text-foreground-muted">
       &mdash; {testimonial.author}, {testimonial.date}
     </div>
@@ -74,7 +75,7 @@ export const TestimonialsSection = ({ testimonials }: TestimonialsSectionProps) 
               {testimonials.map((testimonial) => (
                 <div 
                   key={testimonial.id} 
-                  className="relative min-w-0 flex-shrink-0 flex-grow-0 basis-full px-2 sm:px-4"
+                  className="relative min-w-0 shrink-0 grow-0 basis-full px-2 sm:px-4"
                 >
                   <TestimonialCard testimonial={testimonial} />
                 </div>
@@ -112,7 +113,7 @@ export const TestimonialsSection = ({ testimonials }: TestimonialsSectionProps) 
                 {testimonials.map((testimonial) => (
                   <div 
                     key={testimonial.id} 
-                    className="relative min-w-0 flex-shrink-0 flex-grow-0 md:basis-1/2 px-4"
+                    className="relative min-w-0 shrink-0 grow-0 md:basis-1/2 px-4"
                   >
                     <TestimonialCard testimonial={testimonial} />
                   </div>
@@ -130,7 +131,7 @@ export const TestimonialsSection = ({ testimonials }: TestimonialsSectionProps) 
               </Button>
               
               {/* Progress Bar */}
-              <div className="relative h-1 flex-grow overflow-hidden rounded-full bg-border">
+              <div className="relative h-1 grow overflow-hidden rounded-full bg-border">
                 <div 
                   className="absolute left-0 top-0 h-full bg-foreground" 
                   style={{ width: `${scrollProgress}%` }} 
