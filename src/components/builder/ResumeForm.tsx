@@ -1,10 +1,38 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  CheckCircle, 
+  GripVertical, 
+  ChevronDown, 
+  ChevronUp,
+  LayoutDashboard
+} from "lucide-react";
 import { useResumeStore } from "@/stores/resumeStore";
+import { Resume } from "@/types/resume";
 
-// Import all form components
+// DND Kit Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Import All Form Components
 import { BasicsForm } from "@/components/builder/form/BasicsForm";
 import { WorkForm } from "@/components/builder/form/WorkForm";
 import { EducationForm } from "@/components/builder/form/EducationForm";
@@ -23,132 +51,240 @@ interface Props {
   selectedTemplate: string;
 }
 
-interface FormStep {
+// Configuration mapping keys to Titles and Components
+const SECTION_CONFIG: Record<keyof Resume, { title: string; component: any }> = {
+  basics: { title: "Personal Details", component: BasicsForm },
+  work: { title: "Employment History", component: WorkForm },
+  education: { title: "Education", component: EducationForm },
+  skills: { title: "Skills", component: SkillsForm },
+  projects: { title: "Projects", component: ProjectsForm },
+  awards: { title: "Awards", component: AwardsForm },
+  certificates: { title: "Certificates", component: CertificatesForm },
+  languages: { title: "Languages", component: LanguagesForm },
+  interests: { title: "Interests", component: InterestsForm },
+  publications: { title: "Publications", component: PublicationsForm },
+  volunteer: { title: "Volunteer Experience", component: VolunteerForm },
+  references: { title: "References", component: ReferencesForm },
+  advisory: { title: "Advisory Roles", component: AdvisoryForm },
+};
+
+// --- Draggable Accordion Item Component ---
+interface AccordionProps {
+  id: string;
   title: string;
-  component: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
 }
 
-// All prop drilling is gone
-export default function ResumeForm({ selectedTemplate }: Props) {
-  const [step, setStep] = useState(0);
+function DraggableAccordion({ id, title, isOpen, onToggle, children }: AccordionProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
 
-  // --- Dynamic Step Logic ---
-  const sections: FormStep[] = useMemo(() => {
-    const commonSections = [
-      {
-        title: "Personal Details",
-        component: <BasicsForm selectedTemplate={selectedTemplate} />
-      },
-      {
-        title: "Work Experience",
-        component: <WorkForm />
-      },
-      {
-        title: "Education",
-        component: <EducationForm selectedTemplate={selectedTemplate} />
-      },
-      {
-        title: "Skills",
-        component: <SkillsForm />
-      },
-      {
-        title: "Languages",
-        component: <LanguagesForm />
-      },
-      {
-        title: "Interests",
-        component: <InterestsForm />
-      },
-    ];
-
-    const classicSections = [
-      {
-        title: "Projects",
-        component: <ProjectsForm />
-      },
-      {
-        title: "Awards",
-        component: <AwardsForm />
-      },
-      {
-        title: "Certificates",
-        component: <CertificatesForm />
-      },
-      {
-        title: "Publications",
-        component: <PublicationsForm />
-      },
-      {
-        title: "Volunteer",
-        component: <VolunteerForm />
-      },
-      {
-        title: "References",
-        component: <ReferencesForm />
-      },
-    ];
-
-    const traditionalSections = [
-      {
-        title: "Advisory Roles",
-        component: <AdvisoryForm />
-      }
-    ];
-
-    if (selectedTemplate === 'traditional') {
-      return [...commonSections, ...traditionalSections];
-    }
-    
-    // Default to 'classic'
-    return [...commonSections, ...classicSections];
-
-  }, [selectedTemplate]); // Re-calculate steps only if template changes
-
-  
-  const ActiveComponent = sections[step].component;
-  const isFirstStep = step === 0;
-  const isLastStep = step === sections.length - 1;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : 1,
+    position: 'relative' as const,
+  };
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-md space-y-10">
-      
-      {/* Step Indicator */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">{sections[step].title}</h2>
-        <span className="text-sm font-medium text-gray-500">
-          Step {step + 1} of {sections.length}
-        </span>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`mb-4 rounded-xl border transition-all bg-white shadow-sm ${
+        isDragging ? 'shadow-2xl scale-105 ring-2 ring-blue-500 opacity-90' : 'border-gray-200 hover:border-gray-300'
+      }`}
+    >
+      {/* Header Row */}
+      <div 
+        className={`flex items-center p-4 select-none ${isOpen ? 'border-b border-gray-100' : ''}`}
+      >
+        {/* Drag Handle */}
+        <button 
+          {...attributes} 
+          {...listeners} 
+          className="p-2 mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing transition-colors"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="w-5 h-5" />
+        </button>
+
+        {/* Title & Toggle Area */}
+        <div 
+          className="flex-grow flex items-center justify-between cursor-pointer"
+          onClick={onToggle}
+        >
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-gray-800">{title}</span>
+            {!isOpen && (
+              <span className="text-xs text-gray-400 font-medium">Click to expand</span>
+            )}
+          </div>
+          
+          <button className="text-gray-400 hover:text-blue-600 transition-colors">
+            {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Active Form Section */}
-      <div className="min-h-[300px]">
-        {ActiveComponent}
+      {/* Content Body */}
+      {isOpen && (
+        <div className="p-5 bg-gray-50/50 rounded-b-xl animate-accordion-down">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ResumeForm({ selectedTemplate }: Props) {
+  const { sectionOrder, reorderSections } = useResumeStore();
+  
+  // Modes: Wizard (Guided) vs Editor (Free-form)
+  const [mode, setMode] = useState<'wizard' | 'editor'>('wizard');
+  
+  // Wizard State
+  const [stepIndex, setStepIndex] = useState(0);
+  
+  // Editor State: Track which accordion is open
+  const [expandedSection, setExpandedSection] = useState<keyof Resume | null>('basics');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Filter sections based on the active template
+  const activeSections = useMemo(() => {
+    return sectionOrder.filter(key => {
+      if (selectedTemplate !== 'traditional' && key === 'advisory') return false;
+      return true;
+    });
+  }, [sectionOrder, selectedTemplate]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = sectionOrder.indexOf(active.id as keyof Resume);
+      const newIndex = sectionOrder.indexOf(over?.id as keyof Resume);
+      reorderSections(arrayMove(sectionOrder, oldIndex, newIndex));
+    }
+  };
+
+  // --- Wizard Handlers ---
+  const handleNext = () => {
+    if (stepIndex < activeSections.length - 1) {
+      setStepIndex(s => s + 1);
+    } else {
+      setMode('editor');
+      setExpandedSection('basics');
+    }
+  };
+
+  const handleBack = () => {
+    if (stepIndex > 0) setStepIndex(s => s - 1);
+  };
+
+  // --- RENDER: WIZARD MODE ---
+  if (mode === 'wizard') {
+    const currentSectionKey = activeSections[stepIndex];
+    const CurrentComponent = SECTION_CONFIG[currentSectionKey].component;
+    const progress = ((stepIndex + 1) / activeSections.length) * 100;
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full max-h-[calc(100vh-140px)]">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">
+              {SECTION_CONFIG[currentSectionKey].title}
+            </h2>
+            <button 
+              onClick={() => setMode('editor')} 
+              className="text-xs font-medium text-blue-600 hover:underline flex items-center gap-1"
+            >
+              <LayoutDashboard className="w-3 h-3" />
+              Skip to Overview
+            </button>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-right">Step {stepIndex + 1} of {activeSections.length}</p>
+        </div>
+        <div className="flex-grow overflow-y-auto p-6">
+          <CurrentComponent selectedTemplate={selectedTemplate} />
+        </div>
+        <div className="p-6 border-t border-gray-100 flex justify-between bg-gray-50 rounded-b-xl">
+          <button
+            onClick={handleBack}
+            disabled={stepIndex === 0}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          <button
+            onClick={handleNext}
+            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-md"
+          >
+            {stepIndex === activeSections.length - 1 ? "Finish" : "Next"}
+            {stepIndex === activeSections.length - 1 ? <CheckCircle className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: EDITOR MODE (Accordion List) ---
+  return (
+    <div className="h-full max-h-[calc(100vh-140px)] flex flex-col">
+      {/* Header */}
+      <div className="mb-4 flex justify-between items-end px-1">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Edit Resume</h2>
+          <p className="text-sm text-gray-500">Drag sections to reorder • Expand to edit</p>
+        </div>
+        <button 
+          onClick={() => setMode('wizard')}
+          className="text-xs text-blue-600 hover:underline font-medium"
+        >
+          Restart Wizard
+        </button>
       </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between pt-6 border-t">
-        <button
-          type="button"
-          onClick={() => setStep(s => s - 1)}
-          disabled={isFirstStep}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-200 rounded-md text-gray-700 font-semibold transition-colors
-                     hover:bg-gray-300
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Scrollable Accordion List */}
+      <div className="flex-grow overflow-y-auto pr-2 pb-10">
+        <DndContext 
+          sensors={sensors} 
+          collisionDetection={closestCenter} 
+          onDragEnd={handleDragEnd}
         >
-          <ArrowLeft className="w-5 h-5" />
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={() => setStep(s => s + 1)}
-          disabled={isLastStep}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-md text-white font-semibold transition-colors
-                     hover:bg-blue-700
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-          <ArrowRight className="w-5 h-5" />
-        </button>
+          <SortableContext 
+            items={activeSections} 
+            strategy={verticalListSortingStrategy}
+          >
+            {activeSections.map((key) => {
+              const { title, component: Component } = SECTION_CONFIG[key];
+              return (
+                <DraggableAccordion
+                  key={key}
+                  id={key}
+                  title={title}
+                  isOpen={expandedSection === key}
+                  onToggle={() => setExpandedSection(prev => prev === key ? null : key)}
+                >
+                  <Component selectedTemplate={selectedTemplate} />
+                </DraggableAccordion>
+              );
+            })}
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );

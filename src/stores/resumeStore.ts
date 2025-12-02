@@ -3,7 +3,28 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import { Resume } from '@/types/resume';
 
-// --- Define blank "template" objects ---
+// --- 1. Type Safety Utilities ---
+type RecursiveKeyOf<TObj extends object> = {
+  [TKey in keyof TObj & (string | number)]: TObj[TKey] extends any[]
+    ? `${TKey}` | `${TKey}.${number}` | `${TKey}.${number}.${RecursiveKeyOf<TObj[TKey][number]>}`
+    : TObj[TKey] extends object
+    ? `${TKey}` | `${TKey}.${RecursiveKeyOf<TObj[TKey]>}`
+    : `${TKey}`;
+}[keyof TObj & (string | number)];
+
+type PathValue<T, P extends string> = P extends `${infer Key}.${infer Rest}`
+  ? Key extends keyof T
+    ? PathValue<T[Key], Rest>
+    : T extends any[]
+    ? PathValue<T[number], Rest>
+    : never
+  : P extends keyof T
+  ? T[P]
+  : T extends any[]
+  ? T[number]
+  : never;
+
+// --- 2. Blank "Template" Objects ---
 const blankWorkEntry = {
   name: "", position: "", url: "", startDate: "", endDate: "", summary: "", highlights: []
 };
@@ -21,8 +42,6 @@ const blankReferenceEntry = { name: "", reference: "" };
 const blankVolunteerEntry = { organization: "", position: "", url: "", startDate: "", endDate: "", summary: "", highlights: [] };
 const blankAdvisoryEntry = { organization: "", position: "" };
 
-
-// Define the blank state
 const blankResume: Resume = {
   basics: {
     name: "", label: "", image: "", email: "", phone: "", url: "", summary: "",
@@ -46,9 +65,24 @@ const blankResume: Resume = {
 
 const LOCAL_STORAGE_KEY = 'dynamicResumeData';
 
-// Helper map to enforce "at-least-one" rule
+const defaultSectionOrder: (keyof Resume)[] = [
+  'basics',
+  'work',
+  'education',
+  'skills',
+  'projects',
+  'awards',
+  'certificates',
+  'publications',
+  'languages',
+  'interests',
+  'volunteer',
+  'references',
+  'advisory'
+];
+
 const blankEntryMap: Record<keyof Resume, any> = {
-  basics: {}, // Not an array
+  basics: {},
   work: blankWorkEntry,
   education: blankEducationEntry,
   certificates: blankCertificateEntry,
@@ -63,22 +97,33 @@ const blankEntryMap: Record<keyof Resume, any> = {
   advisory: blankAdvisoryEntry,
 };
 
-// Define the store's state and actions
+// --- 3. Typed State & Actions ---
+
 interface ResumeState {
   resume: Resume;
-  updateField: (path: string, value: any) => void;
+  sectionOrder: (keyof Resume)[];
+
+  updateField: <P extends RecursiveKeyOf<Resume>>(
+    path: P, 
+    value: PathValue<Resume, P>
+  ) => void;
+
   addSection: (section: keyof Resume, template: any) => void;
-  updateStringArray: (path: string, value: string) => void;
+  
+  // NEW: Remove Action
+  removeSection: (section: keyof Resume, index: number) => void;
+
+  updateStringArray: (path: RecursiveKeyOf<Resume>, value: string) => void;
+  reorderSections: (newOrder: (keyof Resume)[]) => void;
 }
 
 export const useResumeStore = create(
   persist(
     immer<ResumeState>((set) => ({
       resume: blankResume,
+      sectionOrder: defaultSectionOrder,
 
-      // --- ACTIONS (No changes here) ---
-
-      updateField: (path: string, value: any) => {
+      updateField: (path, value) => {
         set((state) => {
           const keys = path.split(".");
           let current = state.resume as any;
@@ -93,7 +138,7 @@ export const useResumeStore = create(
         });
       },
 
-      addSection: (section: keyof Resume, template: any) => {
+      addSection: (section, template) => {
         set((state) => {
           const sectionArray = state.resume[section] as any[] | undefined;
           if (Array.isArray(sectionArray)) {
@@ -104,7 +149,17 @@ export const useResumeStore = create(
         });
       },
 
-      updateStringArray: (path: string, value: string) => {
+      // --- NEW: Remove Implementation ---
+      removeSection: (section, index) => {
+        set((state) => {
+          const sectionArray = state.resume[section] as any[] | undefined;
+          if (Array.isArray(sectionArray)) {
+            sectionArray.splice(index, 1);
+          }
+        });
+      },
+
+      updateStringArray: (path, value) => {
         const arr = value.split(',').map(s => s.trim()).filter(Boolean);
         set((state) => {
           const keys = path.split(".");
@@ -115,13 +170,16 @@ export const useResumeStore = create(
           current[keys[keys.length - 1]] = arr;
         });
       },
+
+      reorderSections: (newOrder) => {
+        set((state) => {
+          state.sectionOrder = newOrder;
+        });
+      },
     })),
     {
       name: LOCAL_STORAGE_KEY,
-      
-      // --- THIS IS THE UPDATED MERGE FUNCTION ---
       merge: (persistedState, currentState) => {
-        // Deep merge the persisted state onto the current (new) state
         const mergedState = {
           ...currentState,
           ...(persistedState as ResumeState),
@@ -129,16 +187,14 @@ export const useResumeStore = create(
             ...currentState.resume,
             ...((persistedState as ResumeState)?.resume || {}),
           },
+          sectionOrder: (persistedState as ResumeState)?.sectionOrder || currentState.sectionOrder,
         };
 
         const mergedResume = mergedState.resume;
 
-        // --- ENFORCE "AT-LEAST-ONE" RULE ---
-        // This runs *after* loading from localStorage.
-        // It checks every array. If it's empty, it adds one blank entry.
         Object.keys(blankEntryMap).forEach((key) => {
           const resumeKey = key as keyof Resume;
-          if (resumeKey === 'basics') return; // 'basics' is not an array
+          if (resumeKey === 'basics') return;
 
           const sectionArray = mergedResume[resumeKey] as any[] | undefined;
           if (!sectionArray || sectionArray.length === 0) {
